@@ -9,6 +9,7 @@ from asyncio import Future
 from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum
+from typing import Optional, Union
 
 from websockets.connection import State
 
@@ -27,6 +28,13 @@ class MessageType(IntEnum):
     FUNCTION_RESP = 12
     EXCEPTION = 20
     PORT_MESSAGE = 21
+
+
+@dataclass
+class Message:
+    """BragerConnect WebSocket message model"""
+
+    # TODO: https://stackoverflow.com/questions/38464302/wrapping-a-python-class-around-json-which-is-better
 
 
 @dataclass

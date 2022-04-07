@@ -6,6 +6,7 @@ Asynchronous WebSocket client
 from __future__ import annotations
 
 import json
+import logging
 from socket import gaierror as GetAddressInfoError
 from collections import deque  # pylint: disable=unused-import
 from threading import Lock
@@ -17,12 +18,12 @@ import backoff  # pylint: disable=unused-import
 from websockets.client import WebSocketClientProtocol, connect as ws_connect
 from websockets.exceptions import ConnectionClosed, InvalidURI, InvalidHandshake
 
-from .models.websocket import MessageType, ConnectionInfo, ResponseType, JsonType
+from .models.websocket import Message, MessageType, ConnectionInfo, ResponseType, JsonType
 from .exceptions import MessageException, AuthError
 from .const import LOGGER, HOST, TIMEOUT
 
 
-class BragerConnect:
+class Connection:
     """Main class for handling connections with BragerConnect WebSocket."""
 
     def __init__(
@@ -186,7 +187,7 @@ class BragerConnect:
             if self.reconnect:
                 await self.connect()
             else:
-                await self.disconnect()
+                await self.close()
 
     async def _process_request(self, wrkfnc: dict) -> None:
         """Function that processes messages containing the actions to be performed (requests)
@@ -348,15 +349,15 @@ class BragerConnect:
             self._messages_counter += 1
             return self._messages_counter
 
-    async def disconnect(self) -> None:
-        """Disconnect from the WebSocket of a BragerConnect service."""
+    async def close(self) -> None:
+        """Close WebSocket connection."""
         if not self._client or not self.connected:
             return
         LOGGER.info("Disconnecting from BragerConnect service.")
         self._reconnect = False
         await self._client.close()
 
-    async def __aenter__(self) -> BragerConnect:
+    async def __aenter__(self) -> Connection:
         """Async enter.
         Returns:
             The BragerConnect object.
@@ -368,8 +369,18 @@ class BragerConnect:
         Args:
             _exc_info: Exec type.
         """
-        await self.disconnect()
+        await self.close()
 
 
 if __name__ == "__main__":
-    pass
+    import sys
+    from asyncio import run  # pylint: disable=ungrouped-imports
+
+    async def main(username, password):
+        """Main coroutine"""
+        async with Connection(username, password) as client:
+            await client.connect()
+
+    LOGGER.setLevel(logging.DEBUG)
+    LOGGER.addHandler(logging.StreamHandler(sys.stdout))
+    sys.exit(run(main(sys.argv[1], sys.argv[2])))
