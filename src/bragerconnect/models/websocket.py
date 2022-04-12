@@ -13,7 +13,7 @@ from enum import Enum, IntEnum
 from typing import Optional, Union, Any
 from websockets.connection import State
 
-from ..exceptions import MessageException
+from bragerconnect.exceptions import MessageException
 
 
 JsonType = Optional[dict[str, Union[list, dict, str]]]
