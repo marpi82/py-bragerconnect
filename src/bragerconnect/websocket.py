@@ -6,10 +6,9 @@ Asynchronous WebSocket client
 from __future__ import annotations
 
 import json
-import logging
 from socket import gaierror as GetAddressInfoError
 from threading import Lock
-from asyncio import AbstractEventLoop, get_running_loop, wait_for, sleep
+from asyncio import AbstractEventLoop, get_running_loop, wait_for
 from typing import Any, Coroutine, Optional, Final, Literal, Union, Awaitable, Callable
 import backoff  # pylint: disable=unused-import
 
@@ -174,18 +173,20 @@ class Connection:
                     LOGGER.debug("Received response: %s", message)
                     if len(self._responses) > 0:
                         self._responses.pop(wrkfnc.number).set_result(wrkfnc)
-                else:
+                elif isinstance(wrkfnc, RequestMessage):
                     # It is a request
                     LOGGER.debug("Received request: %s(%s)", wrkfnc.name, wrkfnc.args)
                     if wrkfnc.name == "poolDataChanged":
                         *data, devid = wrkfnc.args
                         data = data.pop()
                         LOGGER.debug("Updating %s pool data... (data: %s)", devid, data)
-                        # update pool data
+                        # TODO: update pool data
                     elif wrkfnc.name == "":
                         pass
+                else:
+                    LOGGER.debug("Received unknown message: %s", message)
         except ConnectionClosed:
-            LOGGER.info("BragerConnect connection lost.")
+            LOGGER.info("WebSocket connection lost.")
             if self.reconnect:
                 await self.connect()
             else:
@@ -372,18 +373,3 @@ class Connection:
             _exc_info: Exec type.
         """
         await self.close()
-
-
-if __name__ == "__main__":
-    import sys
-    from asyncio import run  # pylint: disable=ungrouped-imports
-
-    async def main(username, password):
-        """Main coroutine"""
-        async with Connection(username, password) as client:
-            await client.connect()
-            await sleep(5)
-
-    LOGGER.setLevel(logging.DEBUG)
-    LOGGER.addHandler(logging.StreamHandler(sys.stdout))
-    sys.exit(run(main(sys.argv[1], sys.argv[2])))
