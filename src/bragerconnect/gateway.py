@@ -17,21 +17,31 @@ class Gateway:
     def __init__(self, connection: Connection) -> None:
         """Main class handling data from BragerConnect service."""
         self.conn = connection
-        self.device: set[Device] = set()
+        self.device: list[Device] = []
 
-    async def async_update(self):
+    async def async_update_devices(self):
         """TODO: docstring"""
-        dev_list = await self.conn.async_get_device_id_list()
-        dev_id = (str(dev) for dev in self.device)
+        actual_dev_list = await self.conn.async_get_device_id_list()
+        actual_dev_id = {dev.get("devid") for dev in actual_dev_list}
+        created_dev_id = {str(dev) for dev in self.device}
 
-        for device in self.device:
-            if device.info.devid not in dev_list:
-                
+        # Remove not existing devices from self.device
+        remove_list = (dev for dev in created_dev_id.difference(actual_dev_id))
+        for device in reversed(self.device):
+            if str(device) in remove_list:
+                self.device.remove(device)
 
-        for info in dev_list:
-            if info not in (dev_id):
-                LOGGER.debug("create")
-                self.device.add(Device(self.conn, DeviceInfo.from_dict(info)))
+        # Create or update devices
+        for info in actual_dev_list:
+            devid = info.get("devid")
+            if devid in created_dev_id:
+                for device in self.device:
+                    if device.info.devid == devid:
+                        LOGGER.debug("Updating: %s", devid)
+                        device.info = DeviceInfo.from_dict(info)
+            else:
+                LOGGER.debug("Creating device: %s", devid)
+                self.device.append(Device(self.conn, DeviceInfo.from_dict(info)))
 
     async def __aenter__(self) -> Gateway:
         """Async enter.

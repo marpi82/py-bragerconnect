@@ -13,8 +13,12 @@ if __name__ == "__main__":
     async def main(username, password):
         """Main coroutine"""
         async with Gateway(Connection(username, password)) as gateway:
-            await gateway.async_update()
-            await sleep(5)
+            await gateway.async_update_devices()
+            await sleep(1)
+            await sleep(1)
+
+            for device in gateway.device:
+                print(device.info)
 
     LOGGER.setLevel(logging.DEBUG)
     LOGGER.addHandler(logging.StreamHandler(sys.stdout))
