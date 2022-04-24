@@ -4,11 +4,37 @@ Python library to connect BragerConnect and Home Assistant to work together.
 Device classes
 """
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, Optional
+
+import json
+from dataclasses import dataclass, field, InitVar
+from pathlib import Path
+from typing import Any, Optional, Union
+from pydantic import BaseModel, Field, dataclasses
 
 from ..models.websocket import JsonType
 from ..websocket import Connection
+
+PoolType = dict[int, dict[int, dict[str, Union[int, float, str]]]]
+
+
+def reformat_pool_dict(pool_data: dict[str, JsonType]) -> PoolType:
+    """Reformat Pool data
+
+    Args:
+        pool_data (dict[str, JsonType]): input type
+
+    Returns:
+        PoolType: output type
+    """
+    data = {}
+    for pool_name, pool_value in pool_data.items():
+        for field_name, field_value in pool_value.items():
+            pool_no = int(pool_name[1:])
+            field_no = int(field_name[1:])
+            field_t = str(field_name[0])
+            data.setdefault(pool_no, {}).setdefault(field_no, {})[field_t] = field_value
+
+    return data
 
 
 @dataclass
@@ -33,51 +59,42 @@ class DeviceInfo:
     last_activity_time: Optional[int] = None  # ":2,  # TODO: int?
     alert: Optional[bool] = None  # ":false
 
-    @staticmethod
-    def from_dict(data: list[JsonType]) -> DeviceInfo:
-        """Returns DeviceInfo object
-        Args:
-            data: The data from the BragerConnect service API.
-        Returns:
-            A DeviceInfo object.
-        """
 
-        username = data.get("username")
-        devid = data.get("devid")
-        if username is None or devid is None:
-            raise RuntimeError("BragerDeviceInfo data is incomplete, cannot construct info object.")
+@dataclass
+class Pool:
+    """Brager Pool model"""
 
-        name = data.get("name")
-        if name == "":
-            name = None
+    data: PoolType = field(init=False, default_factory=dict)
+    unit: dict[int, Any] = field(init=False, default_factory=dict)
+    name: dict[str, dict[int, str]] = field(init=False, default_factory=dict)
+    init_data: InitVar[dict] = None
+    init_lang: InitVar[str] = "pl"
 
-        description = data.get("description")
-        if description == "":
-            description = None
+    def __post_init__(self, init_data, init_lang):
+        """TODO: docstring"""
+        if not init_data:
+            raise RuntimeError("Pool data is empty, can't create Pool object")
 
-        warranty_void = data.get("warranty_void")
-        if warranty_void is not None:
-            warranty_void = bool(warranty_void)
+        for pool_name, pool_value in init_data.items():
+            for field_name, field_value in pool_value.items():
+                pool_no = int(pool_name[1:])
+                field_no = int(field_name[1:])
+                field_t = str(field_name[0])
+                self.data.setdefault(pool_no, {}).setdefault(field_no, {})[field_t] = field_value
 
-        return DeviceInfo(
-            username=username,
-            sharedfrom_name=data.get("sharedfrom_name"),
-            devid=devid,
-            distr_group=data.get("distr_group"),
-            id_perm_group=data.get("id_perm_group"),
-            permissions_enabled=bool(data.get("permissions_enabled")),
-            permissions_time_start=data.get("permissions_time_start"),
-            permissions_time_end=data.get("permissions_time_end"),
-            accepted=data.get("accepted"),
-            verified=data.get("verified"),
-            name=name,
-            description=description,
-            producer_permissions=data.get("producer_permissions"),
-            producer_code=int(data.get("producer_code")),
-            warranty_void=warranty_void,
-            last_activity_time=data.get("last_activity_time"),
-            alert=data.get("alert"),
-        )
+        try:
+            path = Path(__file__).parent.parent
+            unit_f = open(f"{path}/lang/{init_lang}_unit.json", "r", encoding="utf-8")
+            name_f = open(f"{path}/lang/{init_lang}_pool.json", "r", encoding="utf-8")
+        except OSError as exception:
+            raise RuntimeError("Could not open/read JSON file.") from exception
+        else:
+            # TODO: klucze jako int
+            self.unit = json.load(unit_f)
+            self.name = json.load(name_f)
+        finally:
+            unit_f.close()
+            name_f.close()
 
 
 class Device:
@@ -85,10 +102,18 @@ class Device:
 
     conn: Connection
     info: DeviceInfo
+    pool: Pool
 
     def __init__(self, connection: Connection, info: DeviceInfo) -> None:
         self.conn = connection
         self.info = info
+
+    async def create(self) -> Device:
+        """TODO: docstring"""
+        await self.conn.async_set_active_device_id(self.info.devid)
+        pool = await self.conn.async_get_all_pool_data()
+        self.pool = Pool(init_data=pool)
+        return self
 
     def __str__(self) -> str:
         return self.info.devid

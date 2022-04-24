@@ -6,9 +6,13 @@ BragerConnect gateway
 from __future__ import annotations
 from typing import Any
 
+from bragerconnect.models.websocket import JsonType
+
 from .websocket import Connection
 from .models.device import Device, DeviceInfo
 from .const import LOGGER
+
+from pydantic import ValidationError
 
 
 class Gateway:
@@ -20,7 +24,7 @@ class Gateway:
         self.device: list[Device] = []
 
     async def async_update_devices(self):
-        """TODO: docstring"""
+        """Updates all devices from BragerConnect service."""
         actual_dev_list = await self.conn.async_get_device_id_list()
         actual_dev_id = {dev.get("devid") for dev in actual_dev_list}
         created_dev_id = {str(dev) for dev in self.device}
@@ -38,10 +42,10 @@ class Gateway:
                 for device in self.device:
                     if device.info.devid == devid:
                         LOGGER.debug("Updating: %s", devid)
-                        device.info = DeviceInfo.from_dict(info)
+                        # device.info = DeviceInfo.from_dict(info)
             else:
                 LOGGER.debug("Creating device: %s", devid)
-                self.device.append(Device(self.conn, DeviceInfo.from_dict(info)))
+                self.device.append(await Device(self.conn, DeviceInfo(**info)).create())
 
     async def __aenter__(self) -> Gateway:
         """Async enter.

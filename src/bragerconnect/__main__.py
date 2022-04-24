@@ -18,7 +18,12 @@ if __name__ == "__main__":
             await sleep(1)
 
             for device in gateway.device:
-                print(device.info)
+                print("Info:")
+                print(str(device.info)[:150])
+                print("Pool data:")
+                print(str(device.pool.data)[:150])
+                print(str(device.pool.name)[:150])
+                print(str(device.pool.unit)[:150])
 
     LOGGER.setLevel(logging.DEBUG)
     LOGGER.addHandler(logging.StreamHandler(sys.stdout))
