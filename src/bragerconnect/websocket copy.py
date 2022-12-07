@@ -12,9 +12,8 @@ from asyncio import AbstractEventLoop, get_running_loop, wait_for, CancelledErro
 from typing import Any, Coroutine, Optional, Final, Literal, Union, Awaitable, Callable
 import backoff  # pylint: disable=unused-import
 
-# from websockets.client import WebSocketClientProtocol, connect as ws_connect
-# from websockets.exceptions import ConnectionClosed, InvalidURI, InvalidHandshake
-from aiohttp import ClientWebSocketResponse, ClientSession
+from websockets.client import WebSocketClientProtocol, connect as ws_connect
+from websockets.exceptions import ConnectionClosed, InvalidURI, InvalidHandshake
 
 from .models.websocket import (
     Message,
@@ -54,8 +53,7 @@ class Connection:
         self._messages_counter: int = -1
         self._messages_counter_thread_lock: Lock = Lock()
 
-        self._session: Optional[ClientSession] = None
-        self._client: Optional[ClientWebSocketResponse] = None
+        self._client: Optional[WebSocketClientProtocol] = None
         # self._device: Optional[list[BragerDevice]] = None
         # self._device_message: Optional[dict[str, Queue]] = None
 
@@ -100,11 +98,10 @@ class Connection:
 
         LOGGER.info("Connecting to BragerConnect WebSocket server.")
         try:
-            self._session = ClientSession()
-            self._client = await self._session._ws_connect(url=self._host)
+            self._client = await ws_connect(uri=self._host)
         except (
-            # InvalidURI,
-            # InvalidHandshake,
+            InvalidURI,
+            InvalidHandshake,
             TimeoutError,
             GetAddressInfoError,
             CancelledError,
@@ -116,13 +113,13 @@ class Connection:
             ) from exception
 
         LOGGER.debug("Waiting for READY_SIGNAL.")
-        message = await self._client.receive(timeout=TIMEOUT)
-        LOGGER.debug("Message received. (%s)", message)
-        wrkfnc = Message.from_json(message.data)
+        message = await wait_for(self._client.recv(), TIMEOUT)
+        LOGGER.debug("Message received.")
+        wrkfnc = Message.from_json(message)
 
         if wrkfnc.mtype == MessageType.READY_SIGNAL:
             LOGGER.debug("Got READY_SIGNAL, sending back, connection ready.")
-            await self._client.send_str(message.data)
+            await self._client.send(message)
         else:
             LOGGER.exception("Received message is not a READY_SIGNAL, exiting")
             raise RuntimeError(
@@ -168,7 +165,7 @@ class Connection:
         try:
             async for message in self._client:
                 try:
-                    wrkfnc = Message.from_json(message.data)
+                    wrkfnc = Message.from_json(message)
                 except MessageException:
                     LOGGER.error("Received message type is not known, skipping...")
                     continue
@@ -224,7 +221,7 @@ class Connection:
         )
 
         LOGGER.debug("Sending request: %s", message)
-        await self._client.send_str(message)
+        await self._client.send(message)
 
         return message_id
 
@@ -364,7 +361,6 @@ class Connection:
         self._reconnect = False
 
         await self._client.close()
-        await self._session.close()
 
     async def __aenter__(self) -> Connection:
         """Async enter.

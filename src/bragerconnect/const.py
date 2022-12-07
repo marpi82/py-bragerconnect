@@ -9,6 +9,7 @@ from typing import Optional, Union
 
 # Connection
 HOST = "wss://cloud.bragerconnect.com"
+# HOST = "wss://sigma-dev.brager.dev"
 TIMEOUT = 10
 
 
