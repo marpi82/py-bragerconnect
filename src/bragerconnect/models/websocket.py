@@ -67,10 +67,15 @@ class Message:
     mtype: MessageType
 
     @staticmethod
-    def from_json(json: str) -> ResponseMessage or RequestMessage:
+    def from_text(json: str) -> ResponseMessage or RequestMessage:
+        """Creates Message object from received message"""
+        return Message.from_json(loads(json))
+        
+            
+    @staticmethod
+    def from_json(msg: JsonType) -> ResponseMessage or RequestMessage:
         """Creates Message object from received message"""
         try:
-            msg = loads(json)
             if not (_wrkfnc := bool(msg.get("wrkfnc"))):
                 raise Exception
             _type = MessageType(int(msg.get("type")))
@@ -81,7 +86,7 @@ class Message:
             _resp = msg.get("resp")
         except Exception as exception:
             raise MessageException(
-                f"Error occured while processing message. ({json})"
+                f"Error occured while processing message. ({msg})"
             ) from exception
         else:
             if _number is not None and _name is None:

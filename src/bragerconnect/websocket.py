@@ -101,7 +101,7 @@ class Connection:
         LOGGER.info("Connecting to BragerConnect WebSocket server.")
         try:
             self._session = ClientSession()
-            self._client = await self._session._ws_connect(url=self._host)
+            self._client = await self._session.ws_connect(url=self._host)
         except (
             # InvalidURI,
             # InvalidHandshake,
@@ -116,13 +116,13 @@ class Connection:
             ) from exception
 
         LOGGER.debug("Waiting for READY_SIGNAL.")
-        message = await self._client.receive(timeout=TIMEOUT)
+        message = await self._client.receive_json(timeout=TIMEOUT)
         LOGGER.debug("Message received. (%s)", message)
-        wrkfnc = Message.from_json(message.data)
+        wrkfnc = Message.from_json(message)
 
         if wrkfnc.mtype == MessageType.READY_SIGNAL:
             LOGGER.debug("Got READY_SIGNAL, sending back, connection ready.")
-            await self._client.send_str(message.data)
+            await self._client.send_json(message)
         else:
             LOGGER.exception("Received message is not a READY_SIGNAL, exiting")
             raise RuntimeError(
@@ -168,7 +168,7 @@ class Connection:
         try:
             async for message in self._client:
                 try:
-                    wrkfnc = Message.from_json(message.data)
+                    wrkfnc = Message.from_text(message.data)
                 except MessageException:
                     LOGGER.error("Received message type is not known, skipping...")
                     continue
