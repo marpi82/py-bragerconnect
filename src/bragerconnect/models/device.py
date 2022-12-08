@@ -9,7 +9,6 @@ import json
 from dataclasses import dataclass, field, InitVar
 from pathlib import Path
 from typing import Any, Optional, Union
-from pydantic import BaseModel, Field, dataclasses
 
 from ..models.websocket import JsonType
 from ..websocket import Connection

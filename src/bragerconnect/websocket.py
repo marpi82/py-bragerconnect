@@ -10,11 +10,8 @@ from socket import gaierror as GetAddressInfoError
 from threading import Lock
 from asyncio import AbstractEventLoop, get_running_loop, wait_for, CancelledError
 from typing import Any, Coroutine, Optional, Final, Literal, Union, Awaitable, Callable
-import backoff  # pylint: disable=unused-import
 
-# from websockets.client import WebSocketClientProtocol, connect as ws_connect
-# from websockets.exceptions import ConnectionClosed, InvalidURI, InvalidHandshake
-from aiohttp import ClientWebSocketResponse, ClientSession
+from aiohttp import ClientWebSocketResponse, ClientSession, WSMsgType
 
 from .models.websocket import (
     Message,
@@ -165,8 +162,9 @@ class Connection:
 
     async def _async_process_messages(self) -> None:
         """Main function that processes incoming messages from Websocket."""
-        try:
-            async for message in self._client:
+
+        async for message in self._client:
+            if message.type == WSMsgType.TEXT:
                 try:
                     wrkfnc = Message.from_text(message.data)
                 except MessageException:
@@ -174,7 +172,7 @@ class Connection:
                     continue
                 if isinstance(wrkfnc, ResponseMessage):
                     # It is a response for request sent
-                    LOGGER.debug("Received response: %s", message)
+                    LOGGER.debug("Received response: %s", message.data)
                     if len(self._responses) > 0:
                         self._responses.pop(wrkfnc.number).set_result(wrkfnc)
                 elif isinstance(wrkfnc, RequestMessage):
@@ -188,13 +186,16 @@ class Connection:
                     elif wrkfnc.name == "":
                         pass
                 else:
-                    LOGGER.debug("Received unknown message: %s", message)
-        except ConnectionClosed:
-            LOGGER.info("WebSocket connection lost.")
-            if self.reconnect:
-                await self.connect()
-            else:
-                await self.close()
+                    LOGGER.debug("Received unknown message: %s", message.data)
+            elif message.type == WSMsgType.ERROR:
+                LOGGER.info("WebSocket message error.")
+                continue
+            elif message.type == WSMsgType.CLOSE or WSMsgType.CLOSED or WSMsgType.CLOSING:
+                break
+
+        LOGGER.info("WebSocket connection lost.")
+        if self.reconnect:
+            await self.connect()
 
     async def _async_send_request(
         self,

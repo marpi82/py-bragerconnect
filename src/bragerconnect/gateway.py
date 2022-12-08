@@ -6,13 +6,10 @@ BragerConnect gateway
 from __future__ import annotations
 from typing import Any
 
-from bragerconnect.models.websocket import JsonType
-
 from .websocket import Connection
-from .models.device import Device, DeviceInfo
 from .const import LOGGER
-
-from pydantic import ValidationError
+from .models.device import Device, DeviceInfo
+from .models.websocket import JsonType
 
 
 class Gateway:
