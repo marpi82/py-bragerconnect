@@ -48,7 +48,7 @@ class Connection:
 
         self._loop = loop if loop is not None else get_running_loop()
         self._responses: ResponseType = {}
-        self._messages_counter: int = -1
+        self._messages_counter: int = -2
         self._messages_counter_thread_lock: Lock = Lock()
 
         self._session: Optional[ClientSession] = None
@@ -155,8 +155,17 @@ class Connection:
 
         LOGGER.debug("Authenticating...")
         await self.async_request(
-            "s_login",
-            [username, password, None, None, "bc_web"],
+            "Authenticate",
+            [
+                {
+                    "isEncrypted": False,
+                    "jwt": None,
+                    "username": username,
+                    "password": password,
+                    "token": None,
+                    "version": 10714,
+                },
+            ],
             # IDEA: could be a `bc_web` or `ht_app` - what does it mean?
         )
 
@@ -255,10 +264,15 @@ class Connection:
         else:
             if res.mtype == MessageType.EXCEPTION:
                 LOGGER.exception("Exception response received.")
+                await self.close()
                 if res.response == 2:  # authentication error
                     raise AuthError("Error when logging in (wrong username/password)")
                 else:
-                    raise MessageException("Exception occured while processing request response.")
+                    raise MessageException(
+                        "Exception occured while processing request response. (%s)",
+                        str(res.response),
+                    )
+
         LOGGER.debug("Response value: %s", res.response)
         return res.response
 

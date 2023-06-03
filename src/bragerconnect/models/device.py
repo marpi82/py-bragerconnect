@@ -13,6 +13,7 @@ from typing import Any, Optional, Union
 from ..models.websocket import JsonType
 from ..websocket import Connection
 
+UnitType = dict[Union[float, str], float]
 PoolType = dict[int, dict[int, dict[str, Union[int, float, str]]]]
 
 
@@ -57,6 +58,22 @@ class DeviceInfo:
     warranty_void: Optional[bool] = None  # ":null,
     last_activity_time: Optional[int] = None  # ":2,  # TODO: int?
     alert: Optional[bool] = None  # ":false
+
+
+class Unit:
+    """Brager Unit model"""
+
+    def __init__(self) -> None:
+        """TODO: docstring"""
+        pass
+
+    def get_value(self, value, unit_no) -> UnitType:
+        """TODO: docstring"""
+        pass
+
+    def set_value(self, value, unit_no) -> int:
+        """TODO: docstring"""
+        pass
 
 
 @dataclass
